@@ -42,10 +42,18 @@ jobs:
           languages: ${{ github.event.inputs.languages || 'swift' }}
           build-mode: manual
 
+      # Homebrew installs arm64 libraries, but the traced build defaults to
+      # x86_64, so linking against libgd/libexif fails with
+      # "symbol(s) not found for architecture x86_64". Pin arm64 across the
+      # Swift, C and link steps together - pinning only Swift leaves the C
+      # targets on the other arch and breaks the link just the same.
       - name: Build
         run: |
           export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$PKG_CONFIG_PATH"
-          swift build
+          swift build \
+            -Xswiftc -target -Xswiftc arm64-apple-macosx15.0 \
+            -Xcc -arch -Xcc arm64 \
+            -Xlinker -arch -Xlinker arm64
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
