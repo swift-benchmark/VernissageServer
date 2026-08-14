@@ -28,12 +28,13 @@ jobs:
         with:
           submodules: recursive
 
-      # SwiftGD wraps the native libgd; without it the build dies on
-      # "'gd.h' file not found". This has to run before the CodeQL init,
-      # because the tracing environment it sets up makes brew resolve as
-      # x86_64 and refuse the ARM prefix ("Cannot install under Rosetta 2").
+      # SwiftGD wraps libgd; SwiftExif wraps libexif and libiptcdata - both
+      # declare these as .brew() providers in their manifests. This has to run
+      # before the CodeQL init, because the tracing environment it sets up makes
+      # brew resolve as x86_64 and refuse the ARM prefix
+      # ("Cannot install under Rosetta 2").
       - name: Install native dependencies
-        run: brew install gd
+        run: brew install gd libexif libiptcdata
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
