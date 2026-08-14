@@ -28,17 +28,21 @@ jobs:
         with:
           submodules: recursive
 
+      # SwiftGD wraps the native libgd; without it the build dies on
+      # "'gd.h' file not found". This has to run before the CodeQL init,
+      # because the tracing environment it sets up makes brew resolve as
+      # x86_64 and refuse the ARM prefix ("Cannot install under Rosetta 2").
+      - name: Install native dependencies
+        run: brew install gd
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ github.event.inputs.languages || 'swift' }}
           build-mode: manual
 
-      # SwiftGD wraps the native libgd; without it the build dies on
-      # "'gd.h' file not found".
       - name: Build
         run: |
-          brew install gd
           export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$PKG_CONFIG_PATH"
           swift build
 
