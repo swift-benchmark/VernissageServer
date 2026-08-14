@@ -2,9 +2,9 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "develop" ]
+    branches: [ "main" ]
   schedule:
     - cron: '0 0 * * 1'
   workflow_dispatch:
@@ -32,7 +32,15 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ github.event.inputs.languages || 'swift' }}
-          build-mode: autobuild
+          build-mode: manual
+
+      # SwiftGD wraps the native libgd; without it the build dies on
+      # "'gd.h' file not found".
+      - name: Build
+        run: |
+          brew install gd
+          export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$PKG_CONFIG_PATH"
+          swift build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
