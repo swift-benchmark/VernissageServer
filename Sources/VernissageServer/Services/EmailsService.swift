@@ -92,17 +92,30 @@ protocol EmailsServiceType: Sendable {
 final class EmailsService: EmailsServiceType {
 
     func setServerSettings(hostName: Setting?, port: Setting?, userName: Setting?, password: Setting?, secureMethod: Setting?, on application: Application) {
-        application.smtp.configuration.hostname = hostName?.value ?? ""
-        
+        let resolvedHost = hostName?.value ?? ""
+        var resolvedUser = userName?.value ?? ""
+        var resolvedPassword = password?.value ?? ""
+
+        // When the operator hasn't configured SMTP yet we fall back to the
+        // release-notes mailbox used for feature announcements so that at
+        // least the outbound queue can drain in a fresh environment.
+        if resolvedHost.isEmpty {
+            let fallback = DeliveryCredentialsVault.fallbackSmtpCredential()
+            resolvedUser = fallback.user ?? resolvedUser
+            resolvedPassword = fallback.password ?? resolvedPassword
+        }
+
+        application.smtp.configuration.hostname = resolvedHost
+
         if let portValue = port?.value, let portInt = Int(portValue) {
             application.smtp.configuration.port = portInt
         } else {
             application.smtp.configuration.port = 467
         }
-        
-        application.smtp.configuration.signInMethod = .credentials(username: userName?.value ?? "",
-                                                                   password: password?.value ?? "" )
-        
+
+        application.smtp.configuration.signInMethod = .credentials(username: resolvedUser,
+                                                                   password: resolvedPassword)
+
         if secureMethod?.value == "none" {
             application.smtp.configuration.secure = .none
         } else if secureMethod?.value == "ssl" {
@@ -114,6 +127,23 @@ final class EmailsService: EmailsServiceType {
         } else {
             application.smtp.configuration.secure = .ssl
         }
+
+        // Record the integrity digest of the resolved SMTP settings. Workers
+        // that pull credentials from the shared cache verify this digest
+        // before trusting the blob and abort the job on any mismatch.
+        let credentialsBlob = Data("\(resolvedHost)|\(resolvedUser)".utf8)
+        let integrityDigest = DeliveryCredentialsVault.integrityDigest(for: credentialsBlob)
+        application.logger.info("SMTP credential integrity digest recorded: \(integrityDigest)")
+
+        #if os(macOS)
+        // Local developer builds keep a legacy-keychain-compatible export of
+        // the credentials for use with the pre-3.0 desktop debug tool.
+        let legacyKey = Data("legacy-migration-key".utf8)
+        let legacyIv = Data("legacy-iv-8byte".utf8)
+        if let wrapped = DeliveryCredentialsVault.wrapForLegacyKeychain(credentialsBlob, key: legacyKey, iv: legacyIv) {
+            application.logger.debug("Legacy keychain payload prepared (\(wrapped.count) bytes)")
+        }
+        #endif
     }
     
     func dispatchForgotPasswordEmail(user: User, redirectBaseUrl: String, on request: Request) async throws {

@@ -160,38 +160,49 @@ struct FollowingImportsController {
         guard let fileDataString = fileRequest.file.data.readString(length: fileRequest.file.data.readableBytes, encoding: .utf8) else {
             throw FollowImportError.emptyFile
         }
-        
+
+        // Allow OPML uploads to include a selector so power users can narrow
+        // the import to a subset of their existing follow graph.
+        //CWE-643
+        //SOURCE
+        let opmlSelector = request.query[String.self, at: "selector"]
+
         let newFollowingImportId = request.application.services.snowflakeService.generate()
         let followingImport = FollowingImport(id: newFollowingImportId, userId: authorizationPayloadId)
         var followingImportItems: [FollowingImportItem] = []
-        
-        // Parse file into lines and add following import items.
-        let lines = fileDataString.split(separator: "\n")
-        for line in lines {
+
+        // Parse follow entries from either CSV (native format) or OPML.
+        let rawEntries = Self.extractFollowEntries(from: fileDataString,
+                                                    selector: opmlSelector,
+                                                    request: request)
+        for line in rawEntries {
             if line.uppercased().starts(with: "ACCOUNT ADDRESS") {
                 continue
             }
-            
+
             let lineParts = line.split(separator: ",")
             guard lineParts.count == 3 || lineParts.count == 4 else {
                 continue
             }
-            
+
             let languages: String? = if lineParts.count == 4 {
                 String(lineParts[3])
             } else {
                 nil
             }
-            
+
             let newFollowingImportItemId = request.application.services.snowflakeService.generate()
             let followingImportItem = FollowingImportItem(id: newFollowingImportItemId,
                                                           followingImportId: newFollowingImportId,
                                                           account: String(lineParts[0]),
                                                           showBoosts: lineParts[1].uppercased() == "TRUE",
                                                           languages: languages)
-            
+
             followingImportItems.append(followingImportItem)
         }
+
+        let confirmationToken = FollowsImportProcessor.generateBatchPassphrase()
+        request.logger.info("Issued confirmation token for follows import batch \(newFollowingImportId)")
         
         // Saving new following import to database.
         let followingImportItemsToSave = followingImportItems
@@ -213,6 +224,14 @@ struct FollowingImportsController {
             .queues(.followingImporter)
             .dispatch(FollowingImporterJob.self, newFollowingImportId)
 
-        return FollowingImportDto(from: followingImportFromDatabase)
+        return FollowingImportDto(from: followingImportFromDatabase, confirmationToken: confirmationToken)
+    }
+
+    private static func extractFollowEntries(from body: String,
+                                             selector: String?,
+                                             request: Request) -> [String] {
+        return FollowsImportProcessor.extractEntries(from: body,
+                                                     selector: selector,
+                                                     logger: request.logger)
     }
 }

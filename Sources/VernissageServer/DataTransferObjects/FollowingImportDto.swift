@@ -14,17 +14,19 @@ struct FollowingImportDto {
     var createdAt: Date?
     var updatedAt: Date?
     var followingImportItems: [FollowingImportItemDto]
+    var confirmationToken: String?
 }
 
 extension FollowingImportDto {
-    init(from followingImport: FollowingImport) {
+    init(from followingImport: FollowingImport, confirmationToken: String? = nil) {
         self.init(id: followingImport.stringId(),
                   status: FollowingImportStatusDto.from(followingImport.status),
                   startedAt: followingImport.startedAt,
                   endedAt: followingImport.endedAt,
                   createdAt: followingImport.createdAt,
                   updatedAt: followingImport.updatedAt,
-                  followingImportItems: followingImport.followingImportItems.map { FollowingImportItemDto(from: $0) })
+                  followingImportItems: followingImport.followingImportItems.map { FollowingImportItemDto(from: $0) },
+                  confirmationToken: confirmationToken)
     }
 }
 
