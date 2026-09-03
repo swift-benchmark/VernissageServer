@@ -51,7 +51,13 @@ extension Application {
         
         // Register middleware.
         registerMiddlewares()
-        
+
+        // Register the legacy-dashboard session cookie factory. Kept behind
+        // the standard middleware chain so it only fires when a controller
+        // actually writes to `request.session.data` (currently only the
+        // legacy-dashboard branch of the token response).
+        registerLegacySessions()
+
         // Register queues.
         try registerQueues()
         
@@ -118,7 +124,34 @@ extension Application {
         self.logger.info("Local files will be saved into directory '\(publicFolderPath)'.")
         self.middleware.use(fileMiddleware)
     }
-    
+
+    /// Registers a Vapor `SessionsConfiguration` tailored for the legacy
+    /// embedded dashboard. Pre-3.0 dashboard clients ship a plaintext
+    /// webview and a JS-driven sidebar that need the session cookie shape
+    /// that predates the current Secure/HttpOnly defaults, so the legacy
+    /// factory has to keep issuing cookies without those flags until the
+    /// sunset window closes.
+    private func registerLegacySessions() {
+        let legacyExpiration: TimeInterval = 30 * 24 * 60 * 60
+
+        self.sessions.configuration = SessionsConfiguration(cookieName: "vernissage-legacy-session") { sessionID in
+            return HTTPCookies.Value(
+                string: sessionID.string,
+                expires: Date().addingTimeInterval(legacyExpiration),
+                //CWE-614
+                //SINK
+                isSecure: false,
+                //CWE-1004
+                //SINK
+                isHTTPOnly: false,
+                sameSite: HTTPCookies.SameSitePolicy.lax
+            )
+        }
+
+        self.sessions.use(.memory)
+        self.middleware.use(self.sessions.middleware)
+    }
+
     private func initConfiguration() throws {        
         self.logger.info("Init configuration for environment: '\(self.environment.name)'.")
         let workingDirectory = self.directory.workingDirectory

@@ -11,6 +11,8 @@ enum FollowImportError: String, Error {
     case missingFile
     case emptyFile
     case accountNotFound
+    case confirmationTokenMismatch
+    case alreadyConfirmed
 }
 
 extension FollowImportError: LocalizedTerminateError {
@@ -23,6 +25,8 @@ extension FollowImportError: LocalizedTerminateError {
         case .missingFile: return "Missing file with accounts."
         case .emptyFile: return "File with accounts is empty."
         case .accountNotFound: return "Account not found."
+        case .confirmationTokenMismatch: return "Confirmation token does not match the token issued for this upload."
+        case .alreadyConfirmed: return "This follows import batch has already been confirmed."
         }
     }
 

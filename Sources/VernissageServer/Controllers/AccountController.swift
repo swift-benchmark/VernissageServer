@@ -990,29 +990,13 @@ struct AccountController {
                 response.cookies[Constants.isMachineTrustedName] = isMachineTrustedCookie
             }
 
-            // Legacy dashboard clients need cookie shapes that predate the
-            // current session model. When the request advertises the compat
-            // header we mirror the auth cookie for the plaintext embedded
-            // webview and hydrate a JS-readable prefs cookie for the sidebar.
+            // Legacy dashboard clients need the session cookie shape that
+            // predates the current session model. When the request advertises
+            // the compat header we push the access token into the legacy
+            // session store so the plaintext embedded webview and the JS
+            // sidebar keep working through the shared session cookie.
             if request.headers.first(name: "X-Legacy-Dashboard") != nil {
-                //CWE-614
-                //SINK
-                let legacyAccessToken = HTTPCookies.Value(string: accessToken.accessToken,
-                                                          expires: accessToken.accessTokenExpirationDate,
-                                                          isSecure: false,
-                                                          isHTTPOnly: true,
-                                                          sameSite: HTTPCookies.SameSitePolicy.lax)
-
-                //CWE-1004
-                //SINK
-                let spaMirrorCookie = HTTPCookies.Value(string: accessToken.accessToken,
-                                                        expires: accessToken.accessTokenExpirationDate,
-                                                        isSecure: true,
-                                                        isHTTPOnly: false,
-                                                        sameSite: HTTPCookies.SameSitePolicy.lax)
-
-                response.cookies["legacy_access_token"] = legacyAccessToken
-                response.cookies["spa_access_token"] = spaMirrorCookie
+                request.session.data["legacy-access-token"] = accessToken.accessToken
             }
         }
 

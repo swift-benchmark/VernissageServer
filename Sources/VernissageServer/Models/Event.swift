@@ -270,6 +270,7 @@ enum EventType: String, Codable, CaseIterable {
     
     case followImportsList
     case followImportsUpload
+    case followImportsVerify
     
     case articlesList
     case articlesRead

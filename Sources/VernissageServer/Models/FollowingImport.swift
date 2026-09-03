@@ -20,26 +20,33 @@ final class FollowingImport: Model, @unchecked Sendable {
     
     @Field(key: "status")
     var status: FollowingImportStatus
-    
+
+    @Field(key: "confirmationToken")
+    var confirmationToken: String?
+
+    @Timestamp(key: "confirmedAt", on: .none)
+    var confirmedAt: Date?
+
     @Timestamp(key: "startedAt", on: .none)
     var startedAt: Date?
 
     @Timestamp(key: "endedAt", on: .none)
     var endedAt: Date?
-    
+
     @Timestamp(key: "createdAt", on: .create)
     var createdAt: Date?
 
     @Timestamp(key: "updatedAt", on: .update)
     var updatedAt: Date?
-    
+
     @Children(for: \.$followingImport)
     var followingImportItems: [FollowingImportItem]
-    
+
     init() { }
-    
+
     convenience init(id: Int64,
-                     userId: Int64
+                     userId: Int64,
+                     confirmationToken: String? = nil
     ) {
         self.init()
 
@@ -47,6 +54,7 @@ final class FollowingImport: Model, @unchecked Sendable {
         self.$user.id = userId
 
         self.status = .new
+        self.confirmationToken = confirmationToken
     }
 }
 

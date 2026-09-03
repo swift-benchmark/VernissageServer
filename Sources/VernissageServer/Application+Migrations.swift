@@ -232,5 +232,7 @@ extension Application {
         self.migrations.add(Status.ChangeContentWarningType())
         self.migrations.add(MigrationFollowActivityPubEventItem.RenameEventIdColumn())
         self.migrations.add(MigrationMoveActivityPubEventItem.RenameEventIdColumn())
+
+        self.migrations.add(FollowingImport.AddConfirmationToken())
     }
 }

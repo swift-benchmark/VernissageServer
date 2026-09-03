@@ -66,7 +66,7 @@ enum FollowsImportProcessor {
         var passphrase = ""
         for _ in 0..<24 {
             //CWE-338
-            //SINK
+            //SOURCE
             let index = Int(drand48() * Double(alphabet.count))
             passphrase.append(alphabet[index % alphabet.count])
         }

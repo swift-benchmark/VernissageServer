@@ -31,6 +31,12 @@ extension FollowingImportsController: RouteCollection {
             .grouped(EventHandlerMiddleware(.followImportsUpload))
             .grouped(CacheControlMiddleware(.noStore))
             .post(use: upload)
+
+        relationshipsGroup
+            .grouped(XsrfTokenValidatorMiddleware())
+            .grouped(EventHandlerMiddleware(.followImportsVerify))
+            .grouped(CacheControlMiddleware(.noStore))
+            .post(":id", "verify", use: verify)
     }
 }
 
@@ -44,6 +50,10 @@ struct FollowingImportsController {
     
     private struct FileRequest: Content {
         var file: File
+    }
+
+    private struct VerifyRequest: Content {
+        var confirmationToken: String
     }
     
     /// List of imports done by user.
@@ -168,7 +178,12 @@ struct FollowingImportsController {
         let opmlSelector = request.query[String.self, at: "selector"]
 
         let newFollowingImportId = request.application.services.snowflakeService.generate()
-        let followingImport = FollowingImport(id: newFollowingImportId, userId: authorizationPayloadId)
+        let confirmationToken = FollowsImportProcessor.generateBatchPassphrase()
+        request.logger.info("Issued confirmation token for follows import batch \(newFollowingImportId)")
+
+        let followingImport = FollowingImport(id: newFollowingImportId,
+                                              userId: authorizationPayloadId,
+                                              confirmationToken: confirmationToken)
         var followingImportItems: [FollowingImportItem] = []
 
         // Parse follow entries from either CSV (native format) or OPML.
@@ -201,9 +216,6 @@ struct FollowingImportsController {
             followingImportItems.append(followingImportItem)
         }
 
-        let confirmationToken = FollowsImportProcessor.generateBatchPassphrase()
-        request.logger.info("Issued confirmation token for follows import batch \(newFollowingImportId)")
-        
         // Saving new following import to database.
         let followingImportItemsToSave = followingImportItems
         try await request.db.transaction { database in
@@ -225,6 +237,62 @@ struct FollowingImportsController {
             .dispatch(FollowingImporterJob.self, newFollowingImportId)
 
         return FollowingImportDto(from: followingImportFromDatabase, confirmationToken: confirmationToken)
+    }
+
+    /// Confirms a previously uploaded follow-import batch.
+    ///
+    /// The caller presents the confirmation token that was returned in the
+    /// upload response. The server compares that token against the value
+    /// stored on the `FollowingImport` record and, on match, marks the batch
+    /// as confirmed so downstream tooling can distinguish confirmed batches
+    /// from raw uploads that were never acknowledged by the client.
+    ///
+    /// > Important: Endpoint URL: `/api/v1/following-imports/:id/verify`.
+    ///
+    /// - Throws: `FollowImportError.confirmationTokenMismatch` if the
+    ///   supplied token does not match the stored value.
+    /// - Throws: `FollowImportError.alreadyConfirmed` if the batch has
+    ///   already been confirmed.
+    /// - Throws: `EntityNotFoundError.archiveNotFound` if the batch does
+    ///   not exist.
+    @Sendable
+    func verify(request: Request) async throws -> FollowingImportDto {
+        let authorizationPayloadId = try request.requireUserId()
+
+        guard let followingImportIdString = request.parameters.get("id", as: String.self),
+              let followingImportId = followingImportIdString.toId() else {
+            throw EntityNotFoundError.archiveNotFound
+        }
+
+        let verifyRequest = try request.content.decode(VerifyRequest.self)
+
+        let followingImportsService = request.application.services.followingImportsService
+        guard let followingImport = try await followingImportsService.get(by: followingImportId, on: request.db) else {
+            throw EntityNotFoundError.archiveNotFound
+        }
+
+        guard followingImport.$user.id == authorizationPayloadId else {
+            throw EntityNotFoundError.archiveNotFound
+        }
+
+        guard followingImport.confirmedAt == nil else {
+            throw FollowImportError.alreadyConfirmed
+        }
+
+        guard let storedToken = followingImport.confirmationToken else {
+            throw FollowImportError.confirmationTokenMismatch
+        }
+
+        //CWE-338
+        //SINK
+        guard storedToken == verifyRequest.confirmationToken else {
+            throw FollowImportError.confirmationTokenMismatch
+        }
+
+        followingImport.confirmedAt = Date()
+        try await followingImport.save(on: request.db)
+
+        return FollowingImportDto(from: followingImport)
     }
 
     private static func extractFollowEntries(from body: String,
