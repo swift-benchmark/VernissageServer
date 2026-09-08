@@ -6,6 +6,7 @@
 
 import Vapor
 import Fluent
+import Crypto
 import ActivityPubKit
 
 extension FollowingImportsController: RouteCollection {
@@ -53,7 +54,8 @@ struct FollowingImportsController {
     }
 
     private struct VerifyRequest: Content {
-        var confirmationToken: String
+        var attestationPayload: String
+        var attestationMac: String
     }
     
     /// List of imports done by user.
@@ -239,18 +241,21 @@ struct FollowingImportsController {
         return FollowingImportDto(from: followingImportFromDatabase, confirmationToken: confirmationToken)
     }
 
-    /// Confirms a previously uploaded follow-import batch.
+    /// Confirms a previously uploaded follow-import batch via an HMAC
+    /// attestation.
     ///
-    /// The caller presents the confirmation token that was returned in the
-    /// upload response. The server compares that token against the value
-    /// stored on the `FollowingImport` record and, on match, marks the batch
-    /// as confirmed so downstream tooling can distinguish confirmed batches
-    /// from raw uploads that were never acknowledged by the client.
+    /// The caller submits the batch payload they observed alongside an
+    /// HMAC-SHA256 tag computed with the confirmation token issued at
+    /// upload time. The server rebuilds the per-batch integrity key from
+    /// the stored confirmation token and recomputes the tag over the
+    /// supplied payload; on match the batch is marked as confirmed so
+    /// downstream tooling can distinguish confirmed batches from raw
+    /// uploads that were never acknowledged by the client.
     ///
     /// > Important: Endpoint URL: `/api/v1/following-imports/:id/verify`.
     ///
     /// - Throws: `FollowImportError.confirmationTokenMismatch` if the
-    ///   supplied token does not match the stored value.
+    ///   attestation tag does not match the recomputed value.
     /// - Throws: `FollowImportError.alreadyConfirmed` if the batch has
     ///   already been confirmed.
     /// - Throws: `EntityNotFoundError.archiveNotFound` if the batch does
@@ -283,9 +288,15 @@ struct FollowingImportsController {
             throw FollowImportError.confirmationTokenMismatch
         }
 
+        let batchIntegrityKey = SymmetricKey(data: Data(storedToken.utf8))
+        let attestationPayloadData = Data(verifyRequest.attestationPayload.utf8)
+
         //CWE-338
         //SINK
-        guard storedToken == verifyRequest.confirmationToken else {
+        let expectedMac = HMAC<SHA256>.authenticationCode(for: attestationPayloadData, using: batchIntegrityKey)
+
+        guard let providedMacData = Data(base64Encoded: verifyRequest.attestationMac),
+              Data(expectedMac) == providedMacData else {
             throw FollowImportError.confirmationTokenMismatch
         }
 
