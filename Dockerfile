@@ -7,7 +7,7 @@ FROM swift:6.2-noble AS build
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
     && apt-get -q update \
     && apt-get -q dist-upgrade -y \
-    && apt-get install -y libjemalloc-dev libgd-dev libexif-dev libiptcdata0-dev \
+    && apt-get install -y libjemalloc-dev libgd-dev libexif-dev libiptcdata0-dev libldap2-dev libsasl2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up a build area
@@ -77,6 +77,8 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
       libgd-dev \
       libexif-dev \
       libiptcdata0-dev \
+      libldap2 \
+      libsasl2-2 \
       fonts-dejavu \
       fonts-noto-core \
       fonts-roboto \

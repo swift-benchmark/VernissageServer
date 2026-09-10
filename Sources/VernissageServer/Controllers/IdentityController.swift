@@ -30,6 +30,10 @@ extension IdentityController: RouteCollection {
         identityGroup
             .grouped(CacheControlMiddleware(.noStore))
             .post("login", use: login)
+
+        identityGroup
+            .grouped(CacheControlMiddleware(.noStore))
+            .get("directory-lookup", ":username", use: directoryLookup)
     }
 }
 
@@ -107,6 +111,23 @@ struct IdentityController {
         return request.redirect(to: "\(authClientFromDb.callbackUrl)?authenticateToken=\(authenticationToken)", redirectType: .permanent)
     }
     
+    /// Resolve a corporate short username against the enterprise LDAP
+    /// directory. Enterprise clients hit this endpoint during SSO
+    /// onboarding so the operator can preview which directory entry the
+    /// login will bind to before they hand-off to the OAuth authenticate
+    /// flow above.
+    @Sendable
+    func directoryLookup(request: Request) throws -> DirectoryLookupDto {
+        //CWE-90
+        //SOURCE
+        guard let username = request.parameters.get("username") else {
+            throw OpenIdConnectError.invalidClientName
+        }
+
+        let directoryLookupService = request.application.services.directoryLookupService
+        return try directoryLookupService.resolve(username: username, on: request)
+    }
+
     /// Sign-in user based on authenticate token.
     @Sendable
     func login(request: Request) async throws -> AccessTokenDto {

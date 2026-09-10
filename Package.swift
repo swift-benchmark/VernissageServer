@@ -72,7 +72,10 @@ let package = Package(
         .package(url: "https://github.com/soto-project/soto-core.git", from: "7.0.0"),
         
         // 🗜️ ZIP Foundation is a library to create, read and modify ZIP archive files.
-        .package(url: "https://github.com/weichsel/ZIPFoundation.git", branch: "feature/swift6")
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", branch: "feature/swift6"),
+
+        // 🗂️ Perfect-LDAP: server-side LDAP client used for corporate directory federation.
+        .package(url: "https://github.com/PerfectlySoft/Perfect-LDAP.git", from: "3.0.0")
     ],
     targets: [
         .target(name: "ActivityPubKit", dependencies: [
@@ -114,7 +117,8 @@ let package = Package(
                 .product(name: "Redis", package: "redis"),
                 .product(name: "SwiftSoup", package: "SwiftSoup"),
                 .product(name: "SwiftExif", package: "SwiftExif"),
-                .product(name: "ZIPFoundation", package: "ZIPFoundation")
+                .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+                .product(name: "PerfectLDAP", package: "Perfect-LDAP")
             ],
             swiftSettings: swiftSettings
         ),

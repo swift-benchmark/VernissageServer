@@ -1,5 +1,5 @@
 {
-  "originHash" : "517b83031e5fc756a7ca58eb2355ede3024c322e063b781b310b87fb3b0dbf39",
+  "originHash" : "5b54ebce1da02bc99bf92fe2d0b88e355eb0839e75022cb0605a5d4e7d84a5ee",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -143,6 +143,42 @@
       "state" : {
         "revision" : "397a9cb550d33367b9ec4e6e5a1a73151cc39de2",
         "version" : "7.0.0"
+      }
+    },
+    {
+      "identity" : "perfect-iconv",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PerfectSideRepos/Perfect-ICONV.git",
+      "state" : {
+        "revision" : "9158e26559b7e33eff6b9bd890fd1e80134dd3af",
+        "version" : "3.0.1"
+      }
+    },
+    {
+      "identity" : "perfect-ldap",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PerfectlySoft/Perfect-LDAP.git",
+      "state" : {
+        "revision" : "e351ef5b9497265f9498555820e408e57f00f950",
+        "version" : "3.0.2"
+      }
+    },
+    {
+      "identity" : "perfect-libsasl",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PerfectlySoft/Perfect-libSASL.git",
+      "state" : {
+        "revision" : "22dca7e03160de0a307927d7072361d1fd80436d",
+        "version" : "1.0.2"
+      }
+    },
+    {
+      "identity" : "perfect-openldap",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PerfectlySoft/Perfect-OpenLDAP.git",
+      "state" : {
+        "revision" : "3c0ba5dfecca166180a8f9f637a1b04e540a105b",
+        "version" : "1.0.3"
       }
     },
     {
