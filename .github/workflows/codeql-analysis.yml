@@ -17,7 +17,12 @@ on:
 jobs:
   analyze:
     name: Analyze
-    runs-on: macos-latest
+    # Linux, not macOS: the CWE-90 plant added Perfect-LDAP, whose transitive
+    # dependency Perfect-ICONV does not compile with the macOS toolchain
+    # ("cannot find 'memset' in scope"). These are Linux server packages, and
+    # swift:6.2-noble is what the project's own Dockerfile builds with.
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
     permissions:
       contents: write
       security-events: write
@@ -26,15 +31,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          submodules: recursive
+          submodules: true
 
-      # SwiftGD wraps libgd; SwiftExif wraps libexif and libiptcdata - both
-      # declare these as .brew() providers in their manifests. This has to run
-      # before the CodeQL init, because the tracing environment it sets up makes
-      # brew resolve as x86_64 and refuse the ARM prefix
-      # ("Cannot install under Rosetta 2").
+      # SwiftGD wraps libgd; SwiftExif wraps libexif and libiptcdata. On macOS
+      # these came from brew; the apt equivalents are the -dev packages. Install
+      # before init: this step only downloads, there is nothing to trace.
       - name: Install native dependencies
-        run: brew install gd libexif libiptcdata
+        run: |
+          apt-get update
+          apt-get install -y libgd-dev libexif-dev libiptcdata0-dev libssl-dev libldap2-dev libsasl2-dev
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -42,18 +47,8 @@ jobs:
           languages: ${{ github.event.inputs.languages || 'swift' }}
           build-mode: manual
 
-      # Homebrew installs arm64 libraries, but the traced build defaults to
-      # x86_64, so linking against libgd/libexif fails with
-      # "symbol(s) not found for architecture x86_64". Pin arm64 across the
-      # Swift, C and link steps together - pinning only Swift leaves the C
-      # targets on the other arch and breaks the link just the same.
       - name: Build
-        run: |
-          export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$PKG_CONFIG_PATH"
-          swift build \
-            -Xswiftc -target -Xswiftc arm64-apple-macosx15.0 \
-            -Xcc -arch -Xcc arm64 \
-            -Xlinker -arch -Xlinker arm64
+        run: swift build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
