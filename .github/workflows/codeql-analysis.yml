@@ -36,6 +36,22 @@ jobs:
       - name: Install native dependencies
         run: brew install gd libexif libiptcdata
 
+      # The CWE-90 plant added Perfect-LDAP, which drags in Perfect-ICONV. That
+      # package guards its imports with `#if os(Linux) import ICONVApiLinux
+      # #else import ICONVApi #endif`: on Linux the C shim pulls Glibc in with
+      # it, on macOS nothing brings Darwin, so memset/memcpy are not in scope and
+      # the build dies. Resolve first (download only, before the tracer) and add
+      # the missing import to the checkout.
+      - name: Resolve dependencies and patch Perfect-ICONV
+        run: |
+          set -euo pipefail
+          swift package resolve
+          f=.build/checkouts/Perfect-ICONV/Sources/PerfectICONV/PerfectICONV.swift
+          if ! grep -q '^import Darwin$' "$f"; then
+            printf 'import Darwin\n' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+          fi
+          head -3 "$f"
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
